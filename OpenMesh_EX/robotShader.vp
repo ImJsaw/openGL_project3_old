@@ -7,6 +7,7 @@ uniform MatVP{
 	mat4 Projection;
 };
 uniform mat4 Model;
+uniform mat4 xf;
 
 
 void main(void) 
@@ -20,5 +21,6 @@ void main(void)
     vec3 vPosition3 = vPosition4.xyz / vPosition4.w;
 
     // Don't forget to transform the geometry!
-    gl_Position = MVP * vec4(vPosition,1);
+    //gl_Position = MVP * vec4(vPosition,1);
+	gl_Position = View * vec4(vPosition,1);
 }

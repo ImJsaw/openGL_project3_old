@@ -9,6 +9,7 @@
 // Include GLM
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "glm/ext.hpp"
 using namespace glm;
 
 Tri_Mesh *mesh;
@@ -36,9 +37,11 @@ GLuint program;
 GLint MatricesIdx;
 GLuint ModelID;
 
+
 mat4 Projection;
 mat4 ViewMatrix;
 mat4 Model;
+mat4 MVP;
 
 ShaderInfo shaders_robot[] = {
 	{ GL_VERTEX_SHADER, "robotShader.vp" },//vertex shader
@@ -219,10 +222,13 @@ namespace OpenMesh_EX {
 			}
 			else std::cout << "initialize GLEW success" << std::endl;//c error
 
+			/*
 			glEnable(GL_DEPTH_TEST);
-			//glDepthFunc(GL_LESS);
+			glDepthFunc(GL_LESS);
 			glCullFace(GL_BACK);
 			glEnable(GL_CULL_FACE);
+			*/
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 			//VAO
 			glGenVertexArrays(1, &VAO);
@@ -233,6 +239,7 @@ namespace OpenMesh_EX {
 			glUseProgram(program);//uniform把计计玡ゲ斗use shader
 			MatricesIdx = glGetUniformBlockIndex(program, "MatVP");
 			ModelID = glGetUniformLocation(program, "Model");
+
 			Projection = glm::perspective(80.0f, 4.0f / 3.0f, 0.1f, 100.0f);
 			ViewMatrix = glm::lookAt(
 				glm::vec3(0, 10, 25), // Camera is at (0,10,25), in World Space
@@ -257,7 +264,7 @@ namespace OpenMesh_EX {
 		//display
 		private: System::Void hkoglPanelControl1_Paint(System::Object^  sender, System::Windows::Forms::PaintEventArgs^  e){
 			std::cout << "refresh" << std::endl;
-			glEnable(GL_COLOR_MATERIAL);
+			//glEnable(GL_COLOR_MATERIAL);
 			glClearColor(1.0, 1.0, 1.0, 1.0);
 			glClear(GL_COLOR_BUFFER_BIT);
 
@@ -265,36 +272,51 @@ namespace OpenMesh_EX {
 			center[0] = 0.0;
 			center[1] = 0.0;
 			center[2] = 0.0;
+			//set camera
 			camera.setupGL(xf * center, 1.0);
-			camera.autospin(xf);
+			//camera.autospin(xf);
 
+			/*
 			glPushMatrix();
 			glMatrixMode(GL_MODELVIEW);
 			glMultMatrixd((double *)xf);
+			*/
+			
 			if (mesh != NULL) {
 				std::cout << "refresh mesh not null" << std::endl;
 				//mesh->Render_SolidWireframe();
 				glGenBuffers(1, &VBO);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO);
-				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(double)* 2, &vertices[0], GL_STATIC_DRAW);
+				std::cout << vertices[0] << std::endl;
+				std::cout << vertices.size() << std::endl;
+
+				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(double), &vertices[0], GL_STATIC_DRAW);
 
 			}
 
 			glEnable(GL_DEPTH_TEST);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);//draw to frame buffer
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 			glBindVertexArray(VAO);
 			glUseProgram(program);//uniform把计计玡ゲ斗use shader
+
 			float eyey = DOR(eyeAngley);
 			ViewMatrix = lookAt(
 				glm::vec3(eyedistance*sin(eyey), 2, eyedistance*cos(eyey)), // Camera is at (0,0,20), in World Space
 				glm::vec3(posX, posY, posZ), // and looks at the origin
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 			);
+
+			MVP = make_mat4((double*)xf);
+
+			std::cout << "xf matrix : " << std::endl  << "---------"<< std::endl << xf << "-------" << std::endl;
+			std::cout << "xf after matrix : " << std::endl << "---------" << std::endl << to_string(MVP) << "-------" << std::endl;
+			std::cout << "p matrix : " << std::endl << "---------" << std::endl << to_string(ViewMatrix) << "-------" << std::endl;
+			std::cout << "v matrix : " << std::endl << "---------" << std::endl << &Projection << "-------" << std::endl;
 			//update data to UBO for MVP
 			glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &ViewMatrix);
+			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
 			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(mat4), sizeof(mat4), &Projection);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
@@ -304,17 +326,22 @@ namespace OpenMesh_EX {
 			glEnableVertexAttribArray(0);
 			glVertexAttribPointer(0,				//location
 				3,				//vec3
-				GL_FLOAT,			//type
+				GL_DOUBLE,			//type
 				GL_FALSE,			//not normalized
 				0,				//strip
 				0);//buffer offset
-			if(isLoad) glDrawArrays(GL_TRIANGLES, 0, face*3);
-			glPopMatrix();
+			if (isLoad) {
+				glDrawArrays(GL_TRIANGLES, 0, face * 3);
+
+				//glDrawArrays(GL_LINES, 0, face * 3);
+
+			}
+			//glPopMatrix();
 		}
 
 				 //mouseClick
 		private: System::Void hkoglPanelControl1_MouseDown(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e){
-			if (e->Button == System::Windows::Forms::MouseButtons::Left){
+			if (e->Button == System::Windows::Forms::MouseButtons::Left || e->Button == System::Windows::Forms::MouseButtons::Middle){
 				//leftClick Or wheelClick
 				point center;
 				Mouse_State = Mouse::NONE;
