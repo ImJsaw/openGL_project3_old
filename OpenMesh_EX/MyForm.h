@@ -21,9 +21,12 @@ xform xf;
 GLCamera camera;
 float fov = 0.7f;
 
-float eyeAngley = 0.0;
-float eyedistance = 30.0;
+float eyeAngleX = 0.0;
+float eyeAngleY = 0.0;
+
+float eyedistance = 2.0;
 #define DOR(angle) (angle*3.1415/180);
+int prevMouseX,prevMouseY;
 
 GLuint VBO;
 GLuint VAO;
@@ -50,10 +53,9 @@ ShaderInfo shaders_robot[] = {
 
 
 static const Mouse::button physical_to_logical_map[] = {
-	Mouse::NONE, Mouse::ROTATE, Mouse::MOVEXY, Mouse::MOVEZ,
-	Mouse::MOVEZ, Mouse::MOVEXY, Mouse::MOVEXY, Mouse::MOVEXY,
+	Mouse::NONE, Mouse::MOUSEDOWN, Mouse::WHEELDOWN , Mouse::WHEELUP
 };
-Mouse::button Mouse_State = Mouse::ROTATE;
+Mouse::button Mouse_State = Mouse::NONE;
 
 namespace OpenMesh_EX {
 
@@ -242,7 +244,7 @@ namespace OpenMesh_EX {
 
 			Projection = glm::perspective(80.0f, 4.0f / 3.0f, 0.1f, 100.0f);
 			ViewMatrix = glm::lookAt(
-				glm::vec3(0, 10, 25), // Camera is at (0,10,25), in World Space
+				glm::vec3(0, 5, 5), // Camera is at (0,10,25), in World Space
 				glm::vec3(0, 0, 0), // and looks at the origin
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,1,0 to look upside-down)
 			);
@@ -263,7 +265,7 @@ namespace OpenMesh_EX {
 		}
 		//display
 		private: System::Void hkoglPanelControl1_Paint(System::Object^  sender, System::Windows::Forms::PaintEventArgs^  e){
-			std::cout << "refresh" << std::endl;
+			//std::cout << "refresh" << std::endl;
 			//glEnable(GL_COLOR_MATERIAL);
 			glClearColor(1.0, 1.0, 1.0, 1.0);
 			glClear(GL_COLOR_BUFFER_BIT);
@@ -273,7 +275,7 @@ namespace OpenMesh_EX {
 			center[1] = 0.0;
 			center[2] = 0.0;
 			//set camera
-			camera.setupGL(xf * center, 1.0);
+			camera.setupGL(xf * center, 1.0 , xf);
 			//camera.autospin(xf);
 
 			/*
@@ -302,14 +304,18 @@ namespace OpenMesh_EX {
 			glBindVertexArray(VAO);
 			glUseProgram(program);//uniform參數數值前必須先use shader
 
-			float eyey = DOR(eyeAngley);
+			float horizonAngle = DOR(eyeAngleX);
+			float verticleAngle = DOR(eyeAngleY);
 			ViewMatrix = lookAt(
-				glm::vec3(eyedistance*sin(eyey), 2, eyedistance*cos(eyey)), // Camera is at (0,0,20), in World Space
-				glm::vec3(posX, posY, posZ), // and looks at the origin
+				glm::vec3(eyedistance*cos(horizonAngle)*cos(verticleAngle), eyedistance*sin(verticleAngle), eyedistance*sin(horizonAngle)*cos(verticleAngle)), // Camera is at (0,0,20), in World Space
+				glm::vec3(0, 0, 0), // and looks at the origin
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 			);
-
+			/*
 			MVP = make_mat4((double*)xf);
+			*/
+			MVP = Projection * ViewMatrix;
+
 
 			/*
 			std::cout << "xf matrix : " << std::endl  << "---------"<< std::endl << xf << "-------" << std::endl;
@@ -343,27 +349,46 @@ namespace OpenMesh_EX {
 			//glPopMatrix();
 		}
 
-				 //mouseClick
+		//mouseClick
 		private: System::Void hkoglPanelControl1_MouseDown(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e){
-			if (e->Button == System::Windows::Forms::MouseButtons::Left || e->Button == System::Windows::Forms::MouseButtons::Middle){
-				//leftClick Or wheelClick
+			if (e->Button == System::Windows::Forms::MouseButtons::Left){
+				//leftClick
+
+				/*
 				point center;
 				Mouse_State = Mouse::NONE;
 				center[0] = 0.0;
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
+				*/
+				
+				//record mouse position for drag event
+				prevMouseX = e->X;
+				prevMouseY = e->Y;
 
+				//read depth
 				point depth;
 				camera.read_depth(e->X, hkoglPanelControl1->Height - e->Y, depth);
-				std::cout << "mouse point : " << e->X  << ","<<  e->Y << std::endl;
+				//std::cout << "mouse point : " << e->X  << ","<<  e->Y << std::endl;
 				std::cout << "point : " << depth << std::endl;
 			}
 		}
 
-				 //mouseDrag
+		//mouseDrag
 		private: System::Void hkoglPanelControl1_MouseMove(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e){
 			if (e->Button == System::Windows::Forms::MouseButtons::Left){
+				//std::cout << "left" << std::endl;
+
+				eyeAngleX += (e->X - prevMouseX)*0.05;
+				eyeAngleY += (e->Y - prevMouseY)*0.05;
+
+				//record mouse position for drag event
+				prevMouseX = e->X;
+				prevMouseY = e->Y;
+				
+				
+				/*
 				point center;
 				Mouse_State = Mouse::ROTATE;
 				center[0] = 0.0;
@@ -372,18 +397,24 @@ namespace OpenMesh_EX {
 				camera.mouse(e->X, e->Y, Mouse_State,
 					xf * center,
 					1.0, xf);
+				*/
 				
 
 				hkoglPanelControl1->Invalidate();
 			}
 
 			if (e->Button == System::Windows::Forms::MouseButtons::Middle){
+				//std::cout << "middle" << std::endl;
+
+				/*
 				point center;
 				Mouse_State = Mouse::MOVEXY;
 				center[0] = 0.0;
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
+				*/
+
 				hkoglPanelControl1->Invalidate();
 			}
 		}
@@ -397,8 +428,9 @@ namespace OpenMesh_EX {
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
-				std::cout << "wheel down" << std::endl;
-				posZ++;
+
+				eyedistance += 0.2;
+				//std::cout << "wheel down, distance : " << eyedistance <<  std::endl;
 				hkoglPanelControl1->Invalidate();
 			}
 			else{
@@ -408,8 +440,8 @@ namespace OpenMesh_EX {
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
-				std::cout << "wheel up" << std::endl;
-				posZ--;
+				eyedistance -= 0.2;
+				//std::cout << "wheel up, distance : "  << eyedistance << std::endl;
 				hkoglPanelControl1->Invalidate();
 			}
 		}

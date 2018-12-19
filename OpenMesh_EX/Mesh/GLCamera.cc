@@ -280,6 +280,7 @@ void GLCamera::mouse(int mousex, int mousey, Mouse::button b,
 		     const point &scene_center, float scene_size,
 		     xform &xf)
 {
+/*
 	if (b == Mouse::NONE && lastb == Mouse::NONE)
 		return;
 
@@ -314,6 +315,7 @@ void GLCamera::mouse(int mousex, int mousey, Mouse::button b,
 
 	lastmousex = mousex;  lastmousey = mousey;  lastb = b;
 	last_time = now();
+*/
 }
 
 
@@ -335,7 +337,7 @@ bool GLCamera::autospin(xform &xf)
 
 
 // Set up the OpenGL camera for rendering
-void GLCamera::setupGL(const point &scene_center, float scene_size) const
+void GLCamera::setupGL(const point &scene_center, float scene_size, xform &xf) const
 {
 	GLint V[4];
 	glGetIntegerv(GL_VIEWPORT, V);
@@ -366,6 +368,7 @@ void GLCamera::setupGL(const point &scene_center, float scene_size) const
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+	glMultMatrixd((double *)xf);
 	GLfloat light0_position[] = { lightdir[0], lightdir[1], lightdir[2], 0 };
 	GLfloat light1_position[] = { -lightdir[0], -lightdir[1], -lightdir[2], 0 };
 	GLfloat light2_position[] = { lightdir[2], 0, -lightdir[0], 0 };

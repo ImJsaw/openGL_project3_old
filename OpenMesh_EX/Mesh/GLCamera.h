@@ -14,7 +14,7 @@ Manages OpenGL camera and trackball/arcball interaction
 
 
 namespace Mouse {
-	enum button { NONE, ROTATE, MOVEXY, MOVEZ, WHEELUP, WHEELDOWN, LIGHT };
+	enum button { NONE, MOUSEDOWN, WHEELDOWN ,WHEELUP};
 };
 
 class GLCamera {
@@ -56,7 +56,7 @@ public:
 		last_time = now();
 	}
 
-	void setupGL(const point &scene_center, float scene_size) const;
+	void setupGL(const point &scene_center, float scene_size , xform &xf) const;
 
 	void mouse(int mousex, int mousey, Mouse::button b,
 		   const point &scene_center, float scene_size,
