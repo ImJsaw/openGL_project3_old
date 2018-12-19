@@ -222,9 +222,9 @@ namespace OpenMesh_EX {
 			}
 			else std::cout << "initialize GLEW success" << std::endl;//c error
 
-			/*
 			glEnable(GL_DEPTH_TEST);
 			glDepthFunc(GL_LESS);
+			/*
 			glCullFace(GL_BACK);
 			glEnable(GL_CULL_FACE);
 			*/
@@ -283,13 +283,14 @@ namespace OpenMesh_EX {
 			*/
 			
 			if (mesh != NULL) {
-				std::cout << "refresh mesh not null" << std::endl;
+				//std::cout << "refresh mesh not null" << std::endl;
 				//mesh->Render_SolidWireframe();
 				glGenBuffers(1, &VBO);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO);
+				/*
 				std::cout << vertices[0] << std::endl;
 				std::cout << vertices.size() << std::endl;
-
+				*/
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(double), &vertices[0], GL_STATIC_DRAW);
 
 			}
@@ -310,10 +311,13 @@ namespace OpenMesh_EX {
 
 			MVP = make_mat4((double*)xf);
 
+			/*
 			std::cout << "xf matrix : " << std::endl  << "---------"<< std::endl << xf << "-------" << std::endl;
 			std::cout << "xf after matrix : " << std::endl << "---------" << std::endl << to_string(MVP) << "-------" << std::endl;
 			std::cout << "p matrix : " << std::endl << "---------" << std::endl << to_string(ViewMatrix) << "-------" << std::endl;
 			std::cout << "v matrix : " << std::endl << "---------" << std::endl << &Projection << "-------" << std::endl;
+			*/
+
 			//update data to UBO for MVP
 			glBindBuffer(GL_UNIFORM_BUFFER, UBO);
 			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
@@ -351,7 +355,8 @@ namespace OpenMesh_EX {
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
 
 				point depth;
-				camera.read_depth(e->X, e->Y, depth);
+				camera.read_depth(e->X, hkoglPanelControl1->Height - e->Y, depth);
+				std::cout << "mouse point : " << e->X  << ","<<  e->Y << std::endl;
 				std::cout << "point : " << depth << std::endl;
 			}
 		}
@@ -392,6 +397,7 @@ namespace OpenMesh_EX {
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
+				std::cout << "wheel down" << std::endl;
 				posZ++;
 				hkoglPanelControl1->Invalidate();
 			}
@@ -402,6 +408,7 @@ namespace OpenMesh_EX {
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
+				std::cout << "wheel up" << std::endl;
 				posZ--;
 				hkoglPanelControl1->Invalidate();
 			}

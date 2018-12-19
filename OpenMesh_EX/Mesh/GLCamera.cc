@@ -19,6 +19,11 @@ Manages OpenGL camera and trackball/arcball interaction
 #endif
 
 #include "GLCamera.h"
+// Include GLM
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include "glm/ext.hpp"
+//using namespace glm;
 
 
 #ifndef M_PI
