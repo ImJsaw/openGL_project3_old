@@ -11,21 +11,45 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "glm/ext.hpp"
 using namespace glm;
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+using namespace std;
 
+#define FACE_SIZE 5000
 Tri_Mesh *mesh;
+Tri_Mesh *patch; // selected patch
+
+GLuint quadVAO;
+GLuint quadVBO;
+unsigned int framebuffer; 
+unsigned int textureColorbuffer;
+unsigned int programFrame;
+glm::vec4 pixel;
+int facesid[FACE_SIZE];
+vector<int> facesid2;
+int facesptr = 0;
+
+
+float quadVertices1[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+	// positions   // texCoords
+	-1.0f,  1.0f,  0.0f, 1.0f,
+	-1.0f, -1.0f,  0.0f, 0.0f,
+	1.0f, -1.0f,  1.0f, 0.0f,
+
+	-1.0f,  1.0f,  0.0f, 1.0f,
+	1.0f, -1.0f,  1.0f, 0.0f,
+	1.0f,  1.0f,  1.0f, 1.0f
+};
 
 bool isLoad = false;
 std::vector<double> vertices;
-
-xform xf;
-GLCamera camera;
-float fov = 0.7f;
+std::vector<double> verticesPatch;
 
 float eyeAngleX = 0.0;
 float eyeAngleY = 0.0;
 float translateX = 0.0;
 float translateY = 0.0;
-
 
 float eyedistance = 2.0;
 #define DOR(angle) (angle*3.1415/180);
@@ -35,31 +59,23 @@ GLuint VBO;
 GLuint VAO;
 GLuint UBO;
 int face;
-
-GLint posX, posY, posZ;
+int facePatch;
 
 GLuint program;
 
-GLint MatricesIdx;
-GLuint ModelID;
+GLuint mvpID;
 GLuint ColorID;
-
 
 mat4 Projection;
 mat4 ViewMatrix;
 mat4 Model;
 mat4 MVP;
 
-ShaderInfo shaders_robot[] = {
-	{ GL_VERTEX_SHADER, "robotShader.vp" },//vertex shader
-	{ GL_FRAGMENT_SHADER, "robotShader.fp" },//fragment shader
+ShaderInfo meshShaders[] = {
+	{ GL_VERTEX_SHADER, "meshShader.vp" },//vertex shader
+	{ GL_FRAGMENT_SHADER, "meshShader.fp" },//fragment shader
 	{ GL_NONE, NULL } };
 
-
-static const Mouse::button physical_to_logical_map[] = {
-	Mouse::NONE, Mouse::MOUSEDOWN, Mouse::WHEELDOWN , Mouse::WHEELUP
-};
-Mouse::button Mouse_State = Mouse::NONE;
 
 namespace OpenMesh_EX {
 
@@ -78,9 +94,6 @@ namespace OpenMesh_EX {
 			MyForm(void){
 				//constructer
 				InitializeComponent();
-				posX = 0;
-				posY = 0;
-				posZ = 0;
 				std::cout << "construct" << std::endl;
 			}
 
@@ -216,11 +229,6 @@ namespace OpenMesh_EX {
 
 		//init
 		private: System::Void hkoglPanelControl1_Load(System::Object^  sender, System::EventArgs^  e){
-			//std::cout << "init" << std::endl;
-			glutInitContextVersion(4, 3);//OpenGL version4.3セ膀非
-			glutInitContextFlags(GLUT_FORWARD_COMPATIBLE);//琌甧,GLUT_FORWARD_COMPATIBLEぃや穿(?
-			glutInitContextProfile(GLUT_CORE_PROFILE);
-
 			glewExperimental = GL_TRUE; //竚glewInit()ぇ玡
 			if (glewInit()) {
 				std::cerr << "Unable to initialize GLEW ... exiting" << std::endl;//c error
@@ -231,20 +239,19 @@ namespace OpenMesh_EX {
 			glEnable(GL_DEPTH_TEST);
 			glDepthFunc(GL_LESS);
 			/*
+			*/
 			glCullFace(GL_BACK);
 			glEnable(GL_CULL_FACE);
-			*/
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 			//VAO
 			glGenVertexArrays(1, &VAO);
 			glBindVertexArray(VAO);
 
-			program = LoadShaders(shaders_robot);//弄shader
+			program = LoadShaders(meshShaders);//弄shader
 
 			glUseProgram(program);//uniform把计计玡ゲ斗use shader
-			MatricesIdx = glGetUniformBlockIndex(program, "MatVP");
-			ModelID = glGetUniformLocation(program, "Model");
+			mvpID = glGetUniformLocation(program, "MVP");
 			ColorID = glGetUniformLocation(program, "color");
 
 			Projection = glm::perspective(80.0f, 4.0f / 3.0f, 0.1f, 100.0f);
@@ -254,57 +261,74 @@ namespace OpenMesh_EX {
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,1,0 to look upside-down)
 			);
 
-			//UBO
-			glGenBuffers(1, &UBO);
-			glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-			glBufferData(GL_UNIFORM_BUFFER, sizeof(mat4) * 2, NULL, GL_DYNAMIC_DRAW);
-			//get uniform struct size
-			int UBOsize = 0;
-			glGetActiveUniformBlockiv(program, MatricesIdx, GL_UNIFORM_BLOCK_DATA_SIZE, &UBOsize);
-			//bind UBO to its idx
-			glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, UBOsize);
-			glUniformBlockBinding(program, MatricesIdx, 0);
-
 			glClearColor(0.0, 0.0, 0.0, 1);//black screen
+
+			//use frameBuffer to store face id
+			ShaderInfo shaderframe[] = {
+			{ GL_VERTEX_SHADER, "framebuffer.vp" },//vertex shader
+			{ GL_FRAGMENT_SHADER, "framebuffer.fp" },//fragment shader
+			{ GL_NONE, NULL } };
+			programFrame = LoadShaders(shaderframe);
+			glUseProgram(programFrame);//uniform把计计玡ゲ斗use shader
+
+			// screen quad VAO
+			glGenVertexArrays(1, &quadVAO);
+			glGenBuffers(1, &quadVBO);
+
+			glUseProgram(programFrame);
+			glUniform1i(glGetUniformLocation(programFrame, "screenTexture"), 0);
+
+			// framebuffer configuration
+			// -------------------------
+			glGenFramebuffers(1, &framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+			// create a color attachment texture
+
+			glGenTextures(1, &textureColorbuffer);
+			glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, hkoglPanelControl1->Width, hkoglPanelControl1->Height, 0, GL_RGBA, GL_FLOAT, NULL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+
+
+			GLenum dr[2] = { GL_COLOR_ATTACHMENT0 ,GL_DEPTH_ATTACHMENT };
+			glDrawBuffers(2, dr);
+
+			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+				cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT)
+				cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete attach!" << endl;
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			pixel.r = 0.0f;
+			pixel.g = 0.0f;
+			pixel.b = 0.0f;
+			pixel.a = 0.0f;
+
+
+			for (int i = 0; i < FACE_SIZE; i++) {
+				facesid[i] = -1;
+			}
+			facesptr = 0;
 
 		}
 		//display
 		private: System::Void hkoglPanelControl1_Paint(System::Object^  sender, System::Windows::Forms::PaintEventArgs^  e){
 			//std::cout << "refresh" << std::endl;
-			//glEnable(GL_COLOR_MATERIAL);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+			glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+			glClearDepth(1.0);
 			glClearColor(1.0, 1.0, 1.0, 1.0);
-			glClear(GL_COLOR_BUFFER_BIT);
-
-			point center;
-			center[0] = 0.0;
-			center[1] = 0.0;
-			center[2] = 0.0;
-			//set camera
-			camera.setupGL(xf * center, 1.0 , xf);
-			//camera.autospin(xf);
-
-			/*
-			glPushMatrix();
-			glMatrixMode(GL_MODELVIEW);
-			glMultMatrixd((double *)xf);
-			*/
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			
 			if (mesh != NULL) {
 				//std::cout << "refresh mesh not null" << std::endl;
-				//mesh->Render_SolidWireframe();
 				glGenBuffers(1, &VBO);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO);
-				/*
-				std::cout << vertices[0] << std::endl;
-				std::cout << vertices.size() << std::endl;
-				*/
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(double), &vertices[0], GL_STATIC_DRAW);
-
 			}
-
-			glEnable(GL_DEPTH_TEST);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 			glBindVertexArray(VAO);
 			glUseProgram(program);//uniform把计计玡ゲ斗use shader
@@ -316,27 +340,11 @@ namespace OpenMesh_EX {
 				glm::vec3(0, 0, 0), // and looks at the origin
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 			);
-			/*
-			*/
-			MVP = make_mat4((double*)xf);
+
 			mat4 Model = translate(translateX, translateY,0.0f);
 			MVP = Model * Projection * ViewMatrix;
 
-
-			/*
-			std::cout << "xf matrix : " << std::endl  << "---------"<< std::endl << xf << "-------" << std::endl;
-			std::cout << "xf after matrix : " << std::endl << "---------" << std::endl << to_string(MVP) << "-------" << std::endl;
-			std::cout << "p matrix : " << std::endl << "---------" << std::endl << to_string(ViewMatrix) << "-------" << std::endl;
-			std::cout << "v matrix : " << std::endl << "---------" << std::endl << &Projection << "-------" << std::endl;
-			*/
-
-			//update data to UBO for MVP
-			glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
-			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(mat4), sizeof(mat4), &Projection);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			glUniformMatrix4fv(ModelID, 1, GL_FALSE, &Model[0][0]);
+			glUniformMatrix4fv(mvpID, 1, GL_FALSE, &MVP[0][0]);
 			glBindBuffer(GL_ARRAY_BUFFER, VBO);
 			// 1rst attribute buffer : vertices
 			glEnableVertexAttribArray(0);
@@ -348,6 +356,13 @@ namespace OpenMesh_EX {
 				0);//buffer offset
 			if (isLoad) {
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+				glm::vec3 color = glm::vec3(-1.0, 0.0, 0.0);
+				glUniform3fv(ColorID, 1, &color[0]);
+				glDrawArrays(GL_TRIANGLES, 0, face * 3);
+			}
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+			if (isLoad) {
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				glm::vec3 color = glm::vec3(1.0, 0.85, 0.0);
 				glUniform3fv(ColorID, 1, &color[0]);
 				glDrawArrays(GL_TRIANGLES, 0, face * 3);
@@ -355,121 +370,147 @@ namespace OpenMesh_EX {
 				color = glm::vec3(0.0, 0.0, 0.0);
 				glUniform3fv(ColorID, 1, &color[0]);
 				glDrawArrays(GL_TRIANGLES, 0, face * 3);
+			}
 
-				//glDrawArrays(GL_LINES, 0, face * 3);
+			//----------------------------
+			//礶┮匡(︹)
+			//---------------------------
+			//glDeleteVertexArrays(1, &VAO);
+			//glDeleteBuffers(1, &VBO);
+			if (patch != NULL) {
+				glGenBuffers(1, &VBO);
+				glBindBuffer(GL_ARRAY_BUFFER, VBO);
+				std::cout << verticesPatch[0] << std::endl;
+				std::cout << verticesPatch.size() << std::endl;
+
+				glBufferData(GL_ARRAY_BUFFER, verticesPatch.size() * sizeof(double), &verticesPatch[0], GL_STATIC_DRAW);
+				printf("change the VBO to patch...\n");
+
+				//debug1рVAO璹场だ┰ㄓ
+				glEnableVertexAttribArray(0);
+				glVertexAttribPointer(0,				//location
+					3,				//vec3
+					GL_DOUBLE,			//type
+					GL_FALSE,			//not normalized
+					0,				//strip
+					0);//buffer offset
 
 			}
-			//glPopMatrix();
+
+			glEnable(GL_DEPTH_TEST);
+			glDepthFunc(GL_LEQUAL);
+			//glBindVertexArray(VAO);
+			glUseProgram(program);//uniform把计计玡ゲ斗use shader
+			glUniformMatrix4fv(mvpID, 1, GL_FALSE, &MVP[0][0]);
+			glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+			if (facesid2.size() != 0) {
+				printf("draw red patch...\n");
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+				glm::vec3 color = glm::vec3(1.0, 0.0, 0.0);
+				glUniform3fv(ColorID, 1, &color[0]);
+				glDrawArrays(GL_TRIANGLES, 0, facePatch * 3);
+			}
 		}
 
 		//mouseClick
 		private: System::Void hkoglPanelControl1_MouseDown(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e){
 			if (e->Button == System::Windows::Forms::MouseButtons::Left){
-				//leftClick
-
-				/*
-				point center;
-				Mouse_State = Mouse::NONE;
-				center[0] = 0.0;
-				center[1] = 0.0;
-				center[2] = 0.0;
-				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
-				*/
-				
+				//leftClick	
 				//record mouse position for drag event
 				prevMouseX = e->X;
 				prevMouseY = e->Y;
+				glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+				glReadBuffer(GL_COLOR_ATTACHMENT0);
+				glReadPixels(e->X, hkoglPanelControl1->Height - e->Y, 1, 1, GL_RGBA, GL_FLOAT, &pixel);
+				printf("pixel %f to face id %f\n", pixel.r, pixel.g);
+				printf("mouse x = %d mouse y = %d\n", e->X, hkoglPanelControl1->Height - e->Y);
+				if (isLoad) {
+					// use vector to debug
+					for (int i = 0; i < facesid2.size(); i++) {
 
-				//read depth
-				point depth;
-				camera.read_depth(e->X, hkoglPanelControl1->Height - e->Y, depth);
-				std::cout << "mouse point : " << (float)e->X/(float)hkoglPanelControl1->Width << "," << 1-((float)e->Y / (float)hkoglPanelControl1->Height) << std::endl;
+						if (facesid2[i] == int(pixel.r) - 1) break;
 
-				std::cout << "point : " << depth << std::endl;
+						else if (pixel.r != 0 && i == facesid2.size() - 1) {
+							facesid2.push_back(int(pixel.r) - 1);
+
+							printf("NEW facesid2[i] = %d\n", facesid2[i]);
+							break;
+						}
+					}
+					if (pixel.r != 0 && facesid2.size() == 0) facesid2.push_back(int(pixel.r) - 1);
+					std::sort(facesid2.begin(), facesid2.end());
+
+					printf("selected faces by vector: ");
+					for (int i = 0; i < facesid2.size(); i++) {
+						printf("%d ", facesid2[i]);
+						if (i == facesid2.size() - 1) printf("\n");
+					}
+					printf("facesptr by vector = %d\n", facesid2.size());
+				}
+
+				//----------------------------------
+				//盢┮匡loadvectorい
+				//----------------------------------
+				if (facesid2.size() != 0) {
+					//del old mesh on screen
+					if (patch != NULL) delete patch;
+					patch = new Tri_Mesh;
+					//clear vertices and face to null
+					verticesPatch.clear();
+					//verticesPatch.resize(0);
+					//std::cout << "verticesPatch.resize(0)" << verticesPatch.size() << std::endl;
+					facePatch = 0;
+					// ReadFile(filename, patch); // change form here
+					//patch->loadToBufferPatch(verticesPatch, facePatch, facesid, facesptr);
+					mesh->loadToBufferPatch(verticesPatch, facePatch, facesid2, *patch);
+
+					std::cout << "facePatch" << facePatch << std::endl;
+					std::cout << "verticesPatch.size()" << verticesPatch.size() << std::endl;
+				}
+
+				glReadBuffer(GL_NONE);
+				glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
 			}
 			if (e->Button == System::Windows::Forms::MouseButtons::Middle) {
 				//record mouse position for drag event
 				prevMouseX = e->X;
 				prevMouseY = e->Y;
 			}
+			hkoglPanelControl1->Invalidate();
 		}
 
 		//mouseDrag
 		private: System::Void hkoglPanelControl1_MouseMove(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e){
 			if (e->Button == System::Windows::Forms::MouseButtons::Left){
 				//std::cout << "left" << std::endl;
-
 				eyeAngleX += (e->X - prevMouseX)*0.05;
 				eyeAngleY += (e->Y - prevMouseY)*0.05;
-
 				//record mouse position for drag event
 				prevMouseX = e->X;
 				prevMouseY = e->Y;
-				
-				
-				/*
-				point center;
-				Mouse_State = Mouse::ROTATE;
-				center[0] = 0.0;
-				center[1] = 0.0;
-				center[2] = 0.0;
-				camera.mouse(e->X, e->Y, Mouse_State,
-					xf * center,
-					1.0, xf);
-				*/
-				
-
-				hkoglPanelControl1->Invalidate();
 			}
-
 			if (e->Button == System::Windows::Forms::MouseButtons::Middle){
 				//std::cout << "middle" << std::endl;
 				translateX += (e->X - prevMouseX)*0.002;
 				translateY -= (e->Y - prevMouseY)*0.002;
-				std::cout << "translateX,Y : "  << translateX  << " , " << translateY << std::endl;
-
 				//record mouse position for drag event
 				prevMouseX = e->X;
 				prevMouseY = e->Y;
-				/*
-				point center;
-				Mouse_State = Mouse::MOVEXY;
-				center[0] = 0.0;
-				center[1] = 0.0;
-				center[2] = 0.0;
-				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
-				*/
-
-				hkoglPanelControl1->Invalidate();
 			}
+			hkoglPanelControl1->Invalidate();
 		}
 
 		//mouseWheel
 		private: System::Void hkoglPanelControl1_MouseWheel(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e){
-			if (e->Delta < 0){
-				point center;
-				Mouse_State = Mouse::WHEELDOWN;
-				center[0] = 0.0;
-				center[1] = 0.0;
-				center[2] = 0.0;
-				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
-
-				eyedistance += 0.1;
-				//std::cout << "wheel down, distance : " << eyedistance <<  std::endl;
-				hkoglPanelControl1->Invalidate();
-			}
+			if (e->Delta < 0) eyedistance += 0.1;
 			else{
-				point center;
-				Mouse_State = Mouse::WHEELUP;
-				center[0] = 0.0;
-				center[1] = 0.0;
-				center[2] = 0.0;
-				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
 				eyedistance -= 0.1;
 				if (eyedistance < 0.4) eyedistance = 0.4;
 				//std::cout << "wheel up, distance : "  << eyedistance << std::endl;
-				hkoglPanelControl1->Invalidate();
 			}
+			hkoglPanelControl1->Invalidate();
 		}
 
 		//click "openModel"

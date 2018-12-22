@@ -227,6 +227,7 @@ public:
 	
 	}
 	void loadToBuffer(std::vector<double> & out_vertices , int &face);
+	void loadToBufferPatch(std::vector<double> & out_vertices, int & face, std::vector<int> selected, Tri_Mesh & patch);
 	//-------Edit Flag-------//
     bool                                       Delete_Flag;
 	
