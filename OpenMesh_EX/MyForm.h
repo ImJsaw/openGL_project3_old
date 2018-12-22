@@ -23,6 +23,9 @@ float fov = 0.7f;
 
 float eyeAngleX = 0.0;
 float eyeAngleY = 0.0;
+float translateX = 0.0;
+float translateY = 0.0;
+
 
 float eyedistance = 2.0;
 #define DOR(angle) (angle*3.1415/180);
@@ -39,6 +42,7 @@ GLuint program;
 
 GLint MatricesIdx;
 GLuint ModelID;
+GLuint ColorID;
 
 
 mat4 Projection;
@@ -241,6 +245,7 @@ namespace OpenMesh_EX {
 			glUseProgram(program);//uniform參數數值前必須先use shader
 			MatricesIdx = glGetUniformBlockIndex(program, "MatVP");
 			ModelID = glGetUniformLocation(program, "Model");
+			ColorID = glGetUniformLocation(program, "color");
 
 			Projection = glm::perspective(80.0f, 4.0f / 3.0f, 0.1f, 100.0f);
 			ViewMatrix = glm::lookAt(
@@ -312,9 +317,10 @@ namespace OpenMesh_EX {
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 			);
 			/*
-			MVP = make_mat4((double*)xf);
 			*/
-			MVP = Projection * ViewMatrix;
+			MVP = make_mat4((double*)xf);
+			mat4 Model = translate(translateX, translateY,0.0f);
+			MVP = Model * Projection * ViewMatrix;
 
 
 			/*
@@ -341,6 +347,13 @@ namespace OpenMesh_EX {
 				0,				//strip
 				0);//buffer offset
 			if (isLoad) {
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+				glm::vec3 color = glm::vec3(1.0, 0.85, 0.0);
+				glUniform3fv(ColorID, 1, &color[0]);
+				glDrawArrays(GL_TRIANGLES, 0, face * 3);
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				color = glm::vec3(0.0, 0.0, 0.0);
+				glUniform3fv(ColorID, 1, &color[0]);
 				glDrawArrays(GL_TRIANGLES, 0, face * 3);
 
 				//glDrawArrays(GL_LINES, 0, face * 3);
@@ -370,8 +383,14 @@ namespace OpenMesh_EX {
 				//read depth
 				point depth;
 				camera.read_depth(e->X, hkoglPanelControl1->Height - e->Y, depth);
-				//std::cout << "mouse point : " << e->X  << ","<<  e->Y << std::endl;
+				std::cout << "mouse point : " << (float)e->X/(float)hkoglPanelControl1->Width << "," << 1-((float)e->Y / (float)hkoglPanelControl1->Height) << std::endl;
+
 				std::cout << "point : " << depth << std::endl;
+			}
+			if (e->Button == System::Windows::Forms::MouseButtons::Middle) {
+				//record mouse position for drag event
+				prevMouseX = e->X;
+				prevMouseY = e->Y;
 			}
 		}
 
@@ -405,7 +424,13 @@ namespace OpenMesh_EX {
 
 			if (e->Button == System::Windows::Forms::MouseButtons::Middle){
 				//std::cout << "middle" << std::endl;
+				translateX += (e->X - prevMouseX)*0.002;
+				translateY -= (e->Y - prevMouseY)*0.002;
+				std::cout << "translateX,Y : "  << translateX  << " , " << translateY << std::endl;
 
+				//record mouse position for drag event
+				prevMouseX = e->X;
+				prevMouseY = e->Y;
 				/*
 				point center;
 				Mouse_State = Mouse::MOVEXY;
@@ -429,7 +454,7 @@ namespace OpenMesh_EX {
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
 
-				eyedistance += 0.2;
+				eyedistance += 0.1;
 				//std::cout << "wheel down, distance : " << eyedistance <<  std::endl;
 				hkoglPanelControl1->Invalidate();
 			}
@@ -440,7 +465,8 @@ namespace OpenMesh_EX {
 				center[1] = 0.0;
 				center[2] = 0.0;
 				camera.mouse(e->X, e->Y, Mouse_State, xf * center, 1.0, xf);
-				eyedistance -= 0.2;
+				eyedistance -= 0.1;
+				if (eyedistance < 0.4) eyedistance = 0.4;
 				//std::cout << "wheel up, distance : "  << eyedistance << std::endl;
 				hkoglPanelControl1->Invalidate();
 			}

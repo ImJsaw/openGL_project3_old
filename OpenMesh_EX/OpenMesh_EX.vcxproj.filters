@@ -47,4 +47,12 @@
       <Filter>資源檔</Filter>
     </EmbeddedResource>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="robotShader.fp">
+      <Filter>資源檔</Filter>
+    </None>
+    <None Include="robotShader.vp">
+      <Filter>資源檔</Filter>
+    </None>
+  </ItemGroup>
 </Project>

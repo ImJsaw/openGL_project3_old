@@ -553,7 +553,7 @@ void Tri_Mesh::loadToBuffer(std::vector<double> & out_vertices , int & face){
 			out_vertices.push_back(*(point(fv_it.handle()).data()+1));
 			out_vertices.push_back(*(point(fv_it.handle()).data()+2));
 
-			std::cout << "push" << *(point(fv_it.handle()).data()) << "," << *(point(fv_it.handle()).data() + 1) << "," << *(point(fv_it.handle()).data()+2) << std::endl;
+			//std::cout << "push" << *(point(fv_it.handle()).data()) << "," << *(point(fv_it.handle()).data() + 1) << "," << *(point(fv_it.handle()).data()+2) << std::endl;
 
 			//glNormal3dv(normal(fv_it.handle()));
 			//glVertex3dv(point(fv_it.handle()).data());
