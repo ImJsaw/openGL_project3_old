@@ -604,16 +604,16 @@ void Tri_Mesh::loadToBufferPatch(std::vector<double> & out_vertices, int & face,
 			}
 			if (isSame) continue;
 			if (isPatchHasPoint == 0) { // first vert
-				printf("first point...\n");
+				//printf("first point...\n");
 				vhandle.push_back(patch.add_vertex(Tri_Mesh::Point(out_vertices.at(0), out_vertices.at(1), out_vertices.at(2))));
 				verticesSeq[verticesSeqIndex++] = out_vertices.size() - 3; // record out_vert position
 				mapVerticesToVHandle[out_vertices.size() - 3] = patch.vertices_begin().handle().idx(); // mapping id between patch & out_vert
-				printf("mapVToH = %d : %d\n", out_vertices.size() - 3, patch.vertices_begin().handle().idx());
+				//printf("mapVToH = %d : %d\n", out_vertices.size() - 3, patch.vertices_begin().handle().idx());
 			}else{ // new point
 				vhandle.push_back(patch.add_vertex(Tri_Mesh::Point(out_vertices.at(out_vertices.size() - 3), out_vertices.at(out_vertices.size() - 2), out_vertices.at(out_vertices.size() - 1))));
 				verticesSeq[verticesSeqIndex++] = out_vertices.size() - 3;
 				mapVerticesToVHandle[out_vertices.size() - 3] = (v_it).handle().idx();
-				printf("mapVToH = %d : %d\n", out_vertices.size() - 3, (v_it).handle().idx());
+				//printf("mapVToH = %d : %d\n", out_vertices.size() - 3, (v_it).handle().idx());
 			}
 		}
 		//add face to patch from vhandle
@@ -623,7 +623,7 @@ void Tri_Mesh::loadToBufferPatch(std::vector<double> & out_vertices, int & face,
 			num = mapVerticesToVHandle.find(verticesSeq[i])->second;
 			face_vhandles.push_back(vhandle[num]);
 		}
-		std::cout << "add face to face_vhandles" << std::endl;
+		//std::cout << "add face to face_vhandles" << std::endl;
 		patch.add_face(face_vhandles);
 		verticesSeqIndex = 0;
 	}

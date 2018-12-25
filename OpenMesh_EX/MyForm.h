@@ -381,12 +381,7 @@ namespace OpenMesh_EX {
 			if (patch != NULL) {
 				glGenBuffers(1, &VBO);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO);
-				//std::cout << "vert patch : " << verticesPatch[0] << std::endl;
-				//std::cout << "vert patch size : " << verticesPatch.size() << std::endl;
-
 				glBufferData(GL_ARRAY_BUFFER, verticesPatch.size() * sizeof(double), &verticesPatch[0], GL_STATIC_DRAW);
-				//printf("change the VBO to patch...\n");
-
 				//debug1рVAO璹场だ┰ㄓ
 				glEnableVertexAttribArray(0);
 				glVertexAttribPointer(0,				//location
@@ -395,16 +390,13 @@ namespace OpenMesh_EX {
 					GL_FALSE,			//not normalized
 					0,				//strip
 					0);//buffer offset
-
 			}
 
 			glEnable(GL_DEPTH_TEST);
 			glDepthFunc(GL_LEQUAL);
-			//glBindVertexArray(VAO);
 			glUseProgram(program);//uniform把计计玡ゲ斗use shader
 			glUniformMatrix4fv(mvpID, 1, GL_FALSE, &MVP[0][0]);
 			glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
 			if (facesid2.size() != 0) {
 				//draw red patch
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -431,7 +423,7 @@ namespace OpenMesh_EX {
 					//detect same face already stored
 					for (int i = 0; i < facesid2.size(); i++) {
 						if (facesid2[i] == int(pixel.r) - 1) break;
-						if (pixel.r != 0 && facesid2[i] > int(pixel.r) - 1) { 
+						if (pixel.r != 0 && ( facesid2[i] > int(pixel.r) - 1 || i == facesid2.size()-1 ) ) { 
 							//when id > curID mean no repeat 'cause vector sorted
 							facesid2.push_back(int(pixel.r) - 1);
 							break;
@@ -442,12 +434,13 @@ namespace OpenMesh_EX {
 					std::sort(facesid2.begin(), facesid2.end());
 
 					cout << "selected faceID: ";
-					for (int i = 0; i < facesid2.size(); i++) cout << facesid2[i];
-					cout << endl << "selected face count : " << facesid2.size() << endl;
+					for (int i = 0; i < facesid2.size(); i++) cout << facesid2[i] << " ";
+					cout << endl;
+					//cout << endl << "selected face count : " << facesid2.size() << endl;
 				}
 
 				//----------------------------------
-				//盢┮匡loadvectorい
+				//load face into vector
 				//----------------------------------
 				if (facesid2.size() != 0) {
 					//del old mesh on screen
@@ -462,8 +455,8 @@ namespace OpenMesh_EX {
 					//patch->loadToBufferPatch(verticesPatch, facePatch, facesid, facesptr);
 					mesh->loadToBufferPatch(verticesPatch, facePatch, facesid2, *patch);
 
-					std::cout << "facePatch" << facePatch << std::endl;
-					std::cout << "verticesPatch.size()" << verticesPatch.size() << std::endl;
+					//std::cout << "facePatch" << facePatch << std::endl;
+					//std::cout << "verticesPatch.size()" << verticesPatch.size() << std::endl;
 				}
 
 				glReadBuffer(GL_NONE);
