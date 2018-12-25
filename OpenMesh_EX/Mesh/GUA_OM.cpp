@@ -562,80 +562,70 @@ void Tri_Mesh::loadToBuffer(std::vector<double> & out_vertices , int & face){
 	glPopAttrib();
 }
 
-void Tri_Mesh::loadToBufferPatch(std::vector<double> & out_vertices, int & face, std::vector<int> selected, Tri_Mesh & patch) {
+void Tri_Mesh::loadToBufferPatch(std::vector<double> & out_vertices, int & face, std::vector<int> selectedFace, Tri_Mesh & patch) {
 	FIter f_it;
 	FVIter fv_it;
 	VIter v_it;
 	face = 0;
-	//新的mesh的點和面
 	std::vector<Tri_Mesh::VertexHandle> vhandle;
 	std::vector<Tri_Mesh::VertexHandle>  face_vhandles;
 	int verticesSeq[3] = { 0,0,0 };
-	int verticesSeqPtr = 0;
+	int verticesSeqIndex = 0;
 	int isPatchHasPoint = 0;
 	std::map<int, int> mapVerticesToVHandle;
 	for (f_it = faces_begin(); f_it != faces_end(); ++f_it) {
-		// 檢查這個face有沒有被我選到
+		// check selected face
 		int isFaceSelected = 0;
-		for (int i = 0; i < selected.size(); i++) {
-			if (f_it.handle().idx() == selected[i]) { // 有的話就往下一步
+		for (int i = 0; i < selectedFace.size(); i++) {
+			if (f_it.handle().idx() == selectedFace[i]) { // found face
 				isFaceSelected = 1;
 				break;
 			}
-			else if (f_it.handle().idx() != selected[i] && i == selected.size() - 1) isFaceSelected = 0; // 沒的話就直接套到下一個face
+			else if (f_it.handle().idx() > selectedFace[i] && i == selectedFace.size() - 1) isFaceSelected = 0; // face not selected
 		}
-		if (isFaceSelected == 0) continue;// 沒的話就直接套到下一個face
+		if (isFaceSelected == 0) continue;// goto next face if current not selected
 		face++;
-		for (fv_it = fv_iter(f_it); fv_it; ++fv_it) { // 每個面有三個點
-			// 每個點有三個vertexes
+		for (fv_it = fv_iter(f_it); fv_it; ++fv_it) { // get verts of selected face
 			out_vertices.push_back(*(point(fv_it.handle()).data()));
 			out_vertices.push_back(*(point(fv_it.handle()).data() + 1));
 			out_vertices.push_back(*(point(fv_it.handle()).data() + 2));
-			//每加一個點，就檢查有沒有和patch vhandle的點重複，沒有的話就加入patch vhandle
+			//check repeat vert, if not => add to vhandle
 			isPatchHasPoint = 0;
 			int isSame = 0;
 			for (v_it = patch.vertices_begin(); v_it != patch.vertices_end(); v_it++) {
 				isPatchHasPoint = 1;
-				printf("v_iterator...\n");
+				//check repeat vert
 				if ((out_vertices.at(out_vertices.size() - 3) == patch.point(v_it.handle())[0] && out_vertices.at(out_vertices.size() - 2) == patch.point(v_it.handle())[1] && out_vertices.at(out_vertices.size() - 1) == patch.point(v_it.handle())[2])) {
-					verticesSeq[verticesSeqPtr++] = out_vertices.size() - 3;
+					verticesSeq[verticesSeqIndex++] = out_vertices.size() - 3;
 					mapVerticesToVHandle[out_vertices.size() - 3] = v_it.handle().idx();
 					isSame = 1;
-					printf("isSame...\n");
 					break;
 				}
 			}
-			printf("isPatchHasPoint = %d\n", isPatchHasPoint);
-			if (isPatchHasPoint == 0) { // 如果是一開始patch沒有點的時候
+			if (isSame) continue;
+			if (isPatchHasPoint == 0) { // first vert
 				printf("first point...\n");
-				vhandle.push_back(patch.add_vertex(Tri_Mesh::Point(out_vertices.at(0), out_vertices.at(1), out_vertices.at(2)))); // 第一個點是out_vertices的0,1,2==x,y,z
-				verticesSeq[verticesSeqPtr++] = out_vertices.size() - 3; // 紀錄是在out_vertices第幾個位置
-				mapVerticesToVHandle[out_vertices.size() - 3] = patch.vertices_begin().handle().idx(); // 將out_vertices位置轉換成新patch的點序號
+				vhandle.push_back(patch.add_vertex(Tri_Mesh::Point(out_vertices.at(0), out_vertices.at(1), out_vertices.at(2))));
+				verticesSeq[verticesSeqIndex++] = out_vertices.size() - 3; // record out_vert position
+				mapVerticesToVHandle[out_vertices.size() - 3] = patch.vertices_begin().handle().idx(); // mapping id between patch & out_vert
 				printf("mapVToH = %d : %d\n", out_vertices.size() - 3, patch.vertices_begin().handle().idx());
-			}
-			if (isSame == 0 && isPatchHasPoint == 1) { // 如果是新的點
-				printf("new point...\n");
+			}else{ // new point
 				vhandle.push_back(patch.add_vertex(Tri_Mesh::Point(out_vertices.at(out_vertices.size() - 3), out_vertices.at(out_vertices.size() - 2), out_vertices.at(out_vertices.size() - 1))));
-				verticesSeq[verticesSeqPtr++] = out_vertices.size() - 3;
+				verticesSeq[verticesSeqIndex++] = out_vertices.size() - 3;
 				mapVerticesToVHandle[out_vertices.size() - 3] = (v_it).handle().idx();
 				printf("mapVToH = %d : %d\n", out_vertices.size() - 3, (v_it).handle().idx());
 			}
 		}
-		//每跑完一個面的三個點之後，把面加進去
+		//add face to patch from vhandle
 		int num;
 		face_vhandles.clear();
-		num = mapVerticesToVHandle.find(verticesSeq[0])->second;
-		printf("num = %d\n", num);
-		face_vhandles.push_back(vhandle[num]);
-		num = mapVerticesToVHandle.find(verticesSeq[1])->second;
-		printf("num = %d\n", num);
-		face_vhandles.push_back(vhandle[num]);
-		num = mapVerticesToVHandle.find(verticesSeq[2])->second;
-		printf("num = %d\n", num);
-		face_vhandles.push_back(vhandle[num]);
-		printf("after add three point to face_vhandles...\n");
+		for (int i = 0; i < 3; i++) {
+			num = mapVerticesToVHandle.find(verticesSeq[i])->second;
+			face_vhandles.push_back(vhandle[num]);
+		}
+		std::cout << "add face to face_vhandles" << std::endl;
 		patch.add_face(face_vhandles);
-		verticesSeqPtr = 0;
+		verticesSeqIndex = 0;
 	}
 }
 

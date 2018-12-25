@@ -95,6 +95,13 @@ namespace OpenMesh_EX {
 				//constructer
 				InitializeComponent();
 				std::cout << "construct" << std::endl;
+				pixel.r = 0.0f;
+				pixel.g = 0.0f;
+				pixel.b = 0.0f;
+				pixel.a = 0.0f;
+				for (int i = 0; i < FACE_SIZE; i++) facesid[i] = -1;
+				facesptr = 0;
+				Projection = glm::perspective(80.0f, 4.0f / 3.0f, 0.1f, 100.0f);
 			}
 
 		protected:
@@ -254,7 +261,6 @@ namespace OpenMesh_EX {
 			mvpID = glGetUniformLocation(program, "MVP");
 			ColorID = glGetUniformLocation(program, "color");
 
-			Projection = glm::perspective(80.0f, 4.0f / 3.0f, 0.1f, 100.0f);
 			ViewMatrix = glm::lookAt(
 				glm::vec3(0, 5, 5), // Camera is at (0,10,25), in World Space
 				glm::vec3(0, 0, 0), // and looks at the origin
@@ -286,6 +292,7 @@ namespace OpenMesh_EX {
 
 			glGenTextures(1, &textureColorbuffer);
 			glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+			//GL_RGBA32F for store value > 1
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, hkoglPanelControl1->Width, hkoglPanelControl1->Height, 0, GL_RGBA, GL_FLOAT, NULL);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -296,22 +303,13 @@ namespace OpenMesh_EX {
 			glDrawBuffers(2, dr);
 
 			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-				cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+				cout << "Framebuffer is not complete!" << endl;
 			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT)
-				cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete attach!" << endl;
+				cout << "Framebuffer is not complete attach!" << endl;
+
+			//bind to normal
 			glBindTexture(GL_TEXTURE_2D, 0);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-			pixel.r = 0.0f;
-			pixel.g = 0.0f;
-			pixel.b = 0.0f;
-			pixel.a = 0.0f;
-
-
-			for (int i = 0; i < FACE_SIZE; i++) {
-				facesid[i] = -1;
-			}
-			facesptr = 0;
 
 		}
 		//display
@@ -336,7 +334,7 @@ namespace OpenMesh_EX {
 			float horizonAngle = DOR(eyeAngleX);
 			float verticleAngle = DOR(eyeAngleY);
 			ViewMatrix = lookAt(
-				glm::vec3(eyedistance*cos(horizonAngle)*cos(verticleAngle), eyedistance*sin(verticleAngle), eyedistance*sin(horizonAngle)*cos(verticleAngle)), // Camera is at (0,0,20), in World Space
+				glm::vec3(eyedistance*cos(horizonAngle)*cos(verticleAngle), eyedistance*sin(verticleAngle), eyedistance*sin(horizonAngle)*cos(verticleAngle)), 
 				glm::vec3(0, 0, 0), // and looks at the origin
 				glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 			);
@@ -354,18 +352,20 @@ namespace OpenMesh_EX {
 				GL_FALSE,			//not normalized
 				0,				//strip
 				0);//buffer offset
-			if (isLoad) {
+			if (isLoad) {//draw faceID to frameBuffer
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				glm::vec3 color = glm::vec3(-1.0, 0.0, 0.0);
 				glUniform3fv(ColorID, 1, &color[0]);
 				glDrawArrays(GL_TRIANGLES, 0, face * 3);
 			}
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-			if (isLoad) {
+			if (isLoad) {//draw to screen
+				//face
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				glm::vec3 color = glm::vec3(1.0, 0.85, 0.0);
 				glUniform3fv(ColorID, 1, &color[0]);
 				glDrawArrays(GL_TRIANGLES, 0, face * 3);
+				//line
 				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 				color = glm::vec3(0.0, 0.0, 0.0);
 				glUniform3fv(ColorID, 1, &color[0]);
@@ -377,14 +377,15 @@ namespace OpenMesh_EX {
 			//---------------------------
 			//glDeleteVertexArrays(1, &VAO);
 			//glDeleteBuffers(1, &VBO);
+
 			if (patch != NULL) {
 				glGenBuffers(1, &VBO);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO);
-				std::cout << verticesPatch[0] << std::endl;
-				std::cout << verticesPatch.size() << std::endl;
+				//std::cout << "vert patch : " << verticesPatch[0] << std::endl;
+				//std::cout << "vert patch size : " << verticesPatch.size() << std::endl;
 
 				glBufferData(GL_ARRAY_BUFFER, verticesPatch.size() * sizeof(double), &verticesPatch[0], GL_STATIC_DRAW);
-				printf("change the VBO to patch...\n");
+				//printf("change the VBO to patch...\n");
 
 				//debug1，把VAO重訂的部分拉上來
 				glEnableVertexAttribArray(0);
@@ -405,7 +406,7 @@ namespace OpenMesh_EX {
 			glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
 			if (facesid2.size() != 0) {
-				printf("draw red patch...\n");
+				//draw red patch
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				glm::vec3 color = glm::vec3(1.0, 0.0, 0.0);
 				glUniform3fv(ColorID, 1, &color[0]);
@@ -420,33 +421,29 @@ namespace OpenMesh_EX {
 				//record mouse position for drag event
 				prevMouseX = e->X;
 				prevMouseY = e->Y;
+				//read face
 				glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
 				glReadBuffer(GL_COLOR_ATTACHMENT0);
 				glReadPixels(e->X, hkoglPanelControl1->Height - e->Y, 1, 1, GL_RGBA, GL_FLOAT, &pixel);
-				printf("pixel %f to face id %f\n", pixel.r, pixel.g);
-				printf("mouse x = %d mouse y = %d\n", e->X, hkoglPanelControl1->Height - e->Y);
+				cout << "face id : " << pixel.r << endl;
+				//printf("mouse x = %d mouse y = %d\n", e->X, hkoglPanelControl1->Height - e->Y);
 				if (isLoad) {
-					// use vector to debug
+					//detect same face already stored
 					for (int i = 0; i < facesid2.size(); i++) {
-
 						if (facesid2[i] == int(pixel.r) - 1) break;
-
-						else if (pixel.r != 0 && i == facesid2.size() - 1) {
+						if (pixel.r != 0 && facesid2[i] > int(pixel.r) - 1) { 
+							//when id > curID mean no repeat 'cause vector sorted
 							facesid2.push_back(int(pixel.r) - 1);
-
-							printf("NEW facesid2[i] = %d\n", facesid2[i]);
 							break;
 						}
 					}
+					//first value
 					if (pixel.r != 0 && facesid2.size() == 0) facesid2.push_back(int(pixel.r) - 1);
 					std::sort(facesid2.begin(), facesid2.end());
 
-					printf("selected faces by vector: ");
-					for (int i = 0; i < facesid2.size(); i++) {
-						printf("%d ", facesid2[i]);
-						if (i == facesid2.size() - 1) printf("\n");
-					}
-					printf("facesptr by vector = %d\n", facesid2.size());
+					cout << "selected faceID: ";
+					for (int i = 0; i < facesid2.size(); i++) cout << facesid2[i];
+					cout << endl << "selected face count : " << facesid2.size() << endl;
 				}
 
 				//----------------------------------
