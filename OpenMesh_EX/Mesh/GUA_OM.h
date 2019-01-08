@@ -15,6 +15,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 using namespace glm;
 
+#include <Eigen/Sparse>
+using namespace Eigen;
+
 
 struct Face_InnerAngle
 {
@@ -241,7 +244,7 @@ public:
 	std::vector<OMT::VHandle>                  Minuspt     ;
 	std::vector<OMT::VHandle>                  Extrme_Pt   ;
 
-
+	void getUV(std::vector<double> & patchuv, Tri_Mesh patch, float uvRotateAngle);
 	void Render_Solid();
 	void Render_SolidWireframe();
 	void Render_Wireframe();
