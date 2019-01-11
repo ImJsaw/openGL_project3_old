@@ -1,7 +1,10 @@
 
 #version 430
 
+in vec2 TexCoord;
+
 uniform vec3 color;
+uniform sampler2D sprite;
 
 out vec4 vFragColor;
 
